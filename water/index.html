@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>지구를 살리는 2인용 물 보안관 게임</title>
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for Cute Soft UI -->
+    <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nanum Gothic', sans-serif;
+            background-color: #f0fdfa;
+            user-select: none;
+            overflow-x: hidden;
+        }
+        .font-cute {
+            font-family: 'Gaegu', cursive;
+        }
+        /* 실시간 물탱크 내부 파도 애니메이션 */
+        @keyframes wave {
+            0%, 100% { transform: translateX(0) scaleY(1); }
+            50% { transform: translateX(-20%) scaleY(0.97); }
+        }
+        .water-wave {
+            animation: wave 2s infinite linear;
+        }
+        /* 수도꼭지 물줄기 애니메이션 */
+        @keyframes stream-flow {
+            0% { transform: translateY(0) scaleX(1); opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { transform: translateY(220px) scaleX(0.8); opacity: 0; }
+        }
+        .water-drop {
+            position: absolute;
+            background: linear-gradient(to bottom, #38bdf8, #0284c7);
+            border-radius: 9999px;
+            animation: stream-flow 0.6s infinite linear;
+        }
+        /* 콸콸 경보 진동 효과 */
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-1.5deg); }
+            75% { transform: rotate(1.5deg); }
+        }
+        .danger-shake {
+            animation: shake 0.1s infinite;
+        }
+        /* 페트병 등장 효과 */
+        @keyframes popIn {
+            0% { transform: scale(0) rotate(-15deg); opacity: 0; }
+            70% { transform: scale(1.1) rotate(10deg); opacity: 0.9; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .bottle-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+
+        /* [수정됨] 입가에 고정되어 가볍게 쓱싹거리는 칫솔 애니메이션 */
+        @keyframes brushSlide {
+            0%, 100% { transform: translateX(0px); }
+            50% { transform: translateX(-8px); }
+        }
+        .brush-ani {
+            animation: brushSlide 0.3s infinite ease-in-out;
+        }
+
+        /* [수정됨] 제자리에서 커졌다 작아지는 거품 애니메이션 */
+        @keyframes foamScale {
+            0%, 100% { transform: scale(0.9); opacity: 0.85; }
+            50% { transform: scale(1.15); opacity: 1; }
+        }
+        .foam-ani {
+            animation: foamScale 0.5s infinite ease-in-out;
+        }
+        .foam-ani-alt {
+            animation: foamScale 0.7s infinite ease-in-out;
+            animation-delay: 0.2s;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-4">
+
+    <!-- 상단 전체 헤더 -->
+    <header class="w-full max-w-4xl mx-auto text-center mb-2">
+        <h1 class="font-cute text-4xl md:text-5xl font-extrabold text-teal-600 drop-shadow-sm">
+            💧 출동! 2인용 지구 물 보안관 게임
+        </h1>
+        <p class="text-xs md:text-sm text-slate-500 font-bold mt-1">
+            두 명의 친구가 협동하여 기린과 호랑이의 수도꼭지를 재빨리 잠그고 지구를 구해보세요!
+        </p>
+    </header>
+
+    <!-- 메인 게임 보드 -->
+    <main class="w-full max-w-5xl mx-auto bg-white rounded-[32px] shadow-2xl border-4 border-teal-100 overflow-hidden flex-1 flex flex-col justify-between min-h-[580px]">
+        
+        <!-- 대기 화면 (시작 전) -->
+        <div id="screen-intro" class="flex-1 flex flex-col items-center justify-center text-center p-8 space-y-6">
+            <div class="flex space-x-6">
+                <span class="text-7xl animate-bounce">🦒</span>
+                <span class="text-7xl animate-bounce" style="animation-delay: 0.2s">🐯</span>
+            </div>
+            <div class="space-y-3">
+                <h2 class="text-3xl font-black text-slate-700">물 보안관 2인 합동 작전!</h2>
+                <p class="text-sm md:text-base text-slate-500 max-w-xl mx-auto leading-relaxed">
+                    왼쪽은 <b>1P 기린 지킴이🦒</b>, 오른쪽은 <b>2P 아기호랑이 지킴이🐯</b> 구역입니다!<br>
+                    동물들이 깜빡하고 물을 흘릴 때마다 각자의 <b>수도꼭지 버튼</b>을 눌러 잠가주세요.<br>
+                    마지막에 물이 낭비된 만큼 대형 페트병들이 교실 화면에 가득 쌓이게 됩니다!
+                </p>
+            </div>
+            <button onclick="startGame()" class="px-12 py-5 bg-teal-500 hover:bg-teal-600 active:scale-95 text-white font-black text-2xl rounded-2xl shadow-lg transition-all duration-150">
+                작전 개시! 🎮
+            </button>
+        </div>
+
+        <!-- 플레이 화면 (게임 중) -->
+        <div id="screen-play" class="hidden flex-1 flex flex-col">
+            
+            <!-- 상단 현황 정보 모니터 -->
+            <div class="bg-teal-50/50 p-4 border-b-2 border-teal-100 flex justify-between items-center px-8">
+                <div class="bg-white px-4 py-2 rounded-xl border font-bold text-slate-700 text-sm">
+                    ⏱️ 남은 시간: <span id="game-timer" class="text-lg text-teal-600 font-black ml-1">30초</span>
+                </div>
+                <div class="text-center font-cute text-2xl font-black text-slate-700 animate-pulse">
+                    🚰 물이 켜지면 무조건 터치해! 🚰
+                </div>
+                <div class="bg-white px-4 py-2 rounded-xl border font-bold text-slate-700 text-sm">
+                    🌊 총 낭비량: <span id="total-waste" class="text-lg text-rose-500 font-black ml-1">0.0L</span>
+                </div>
+            </div>
+
+            <!-- 플레이 존 2분할 (1P 기린 구역 vs 2P 호랑이 구역) -->
+            <div class="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x-4 divide-teal-100">
+                
+                <!-- [1P] 기린 구역 -->
+                <div class="p-6 flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-center bg-amber-50/50 p-3 rounded-2xl border border-amber-100">
+                        <span class="text-base font-black text-amber-700">🦒 1P: 기린 지킴이</span>
+                        <span id="p1-score" class="text-sm font-bold text-amber-600">누적 낭비: 0.0 L</span>
+                    </div>
+
+                    <!-- 1P 대형 캐릭터 일러스트 박스 -->
+                    <div id="p1-illustration" class="w-full h-56 bg-white rounded-3xl border-2 border-amber-100 flex items-center justify-center p-1 shadow-inner overflow-hidden">
+                        <!-- 기린 일러스트가 동적으로 삽입됩니다. -->
+                    </div>
+
+                    <div id="p1-stage-desc" class="text-center font-bold text-slate-700 text-sm md:text-base px-2 h-12 flex items-center justify-center">
+                        기린이가 양치 준비를 시작합니다!
+                    </div>
+
+                    <!-- 1P 수도꼭지 배출부 & 물탱크 인터랙션 -->
+                    <div class="h-52 bg-slate-50 rounded-2xl border p-4 flex flex-row items-stretch relative overflow-hidden">
+                        <!-- 수도꼭지 터치 구역 -->
+                        <div class="flex-1 flex flex-col items-center justify-start pt-2 relative">
+                            <div id="p1-faucet" onclick="tapFaucet(1)" class="cursor-pointer group flex flex-col items-center active:scale-90 transition-transform">
+                                <div id="p1-led" class="w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white mb-1 shadow"></div>
+                                <div class="text-6xl filter drop-shadow">🚰</div>
+                                <span class="text-[9px] font-black text-slate-400 mt-1 bg-white px-2 py-0.5 rounded-full shadow-sm">[잠그기 터치]</span>
+                            </div>
+                            <!-- 쏟아지는 물방울 파티클 -->
+                            <div id="p1-stream" class="absolute top-[90px] w-8 h-[100px] overflow-hidden pointer-events-none hidden">
+                                <div class="water-drop w-3 h-5 left-0" style="animation-delay: 0s;"></div>
+                                <div class="water-drop w-2.5 h-6 left-1" style="animation-delay: 0.15s;"></div>
+                                <div class="water-drop w-2 h-4 left-3" style="animation-delay: 0.3s;"></div>
+                                <div class="water-drop w-3 h-7 left-2" style="animation-delay: 0.45s;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 1P 개별 물 저금 수조 -->
+                        <div class="w-32 bg-white/80 border-4 border-slate-600 rounded-b-2xl relative overflow-hidden flex flex-col justify-end shadow-inner">
+                            <div id="p1-tank-water" class="w-[200%] h-0 bg-sky-400 absolute left-0 bottom-0 transition-all duration-100 ease-out origin-bottom water-wave" style="border-top: 3px solid #0284c7; opacity: 0.85;">
+                                <div class="w-full h-full bg-sky-500 opacity-40 absolute bottom-0 left-[-20%] water-wave" style="animation-delay: 1s;"></div>
+                            </div>
+                            <span class="absolute top-2 left-0 right-0 text-center text-[10px] font-black text-slate-400 z-10">1P 수조</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- [2P] 아기호랑이 구역 -->
+                <div class="p-6 flex flex-col justify-between space-y-4">
+                    <div class="flex justify-between items-center bg-orange-50/50 p-3 rounded-2xl border border-orange-100">
+                        <span class="text-base font-black text-orange-700">🐯 2P: 호랑이 지킴이</span>
+                        <span id="p2-score" class="text-sm font-bold text-orange-600">누적 낭비: 0.0 L</span>
+                    </div>
+
+                    <!-- 2P 대형 캐릭터 일러스트 박스 -->
+                    <div id="p2-illustration" class="w-full h-56 bg-white rounded-3xl border-2 border-orange-100 flex items-center justify-center p-1 shadow-inner overflow-hidden">
+                        <!-- 호랑이 일러스트가 동적으로 삽입됩니다. -->
+                    </div>
+
+                    <div id="p2-stage-desc" class="text-center font-bold text-slate-700 text-sm md:text-base px-2 h-12 flex items-center justify-center">
+                        호랑이가 양치 준비를 시작합니다!
+                    </div>
+
+                    <!-- 2P 수도꼭지 배출부 & 물탱크 인터랙션 -->
+                    <div class="h-52 bg-slate-50 rounded-2xl border p-4 flex flex-row items-stretch relative overflow-hidden">
+                        <!-- 수도꼭지 터치 구역 -->
+                        <div class="flex-1 flex flex-col items-center justify-start pt-2 relative">
+                            <div id="p2-faucet" onclick="tapFaucet(2)" class="cursor-pointer group flex flex-col items-center active:scale-90 transition-transform">
+                                <div id="p2-led" class="w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white mb-1 shadow"></div>
+                                <div class="text-6xl filter drop-shadow">🚰</div>
+                                <span class="text-[9px] font-black text-slate-400 mt-1 bg-white px-2 py-0.5 rounded-full shadow-sm">[잠그기 터치]</span>
+                            </div>
+                            <!-- 쏟아지는 물방울 파티클 -->
+                            <div id="p2-stream" class="absolute top-[90px] w-8 h-[100px] overflow-hidden pointer-events-none hidden">
+                                <div class="water-drop w-3 h-5 left-0" style="animation-delay: 0.05s;"></div>
+                                <div class="water-drop w-2.5 h-6 left-1.5" style="animation-delay: 0.2s;"></div>
+                                <div class="water-drop w-2 h-4 left-3" style="animation-delay: 0.35s;"></div>
+                                <div class="water-drop w-3 h-7 left-1" style="animation-delay: 0.5s;"></div>
+                            </div>
+                        </div>
+
+                        <!-- 2P 개별 물 저금 수조 -->
+                        <div class="w-32 bg-white/80 border-4 border-slate-600 rounded-b-2xl relative overflow-hidden flex flex-col justify-end shadow-inner">
+                            <div id="p2-tank-water" class="w-[200%] h-0 bg-sky-400 absolute left-0 bottom-0 transition-all duration-100 ease-out origin-bottom water-wave" style="border-top: 3px solid #0284c7; opacity: 0.85;">
+                                <div class="w-full h-full bg-sky-500 opacity-40 absolute bottom-0 left-[-20%] water-wave" style="animation-delay: 1.5s;"></div>
+                            </div>
+                            <span class="absolute top-2 left-0 right-0 text-center text-[10px] font-black text-slate-400 z-10">2P 수조</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 결과 화면 (게임 종료 후) -->
+        <div id="screen-result" class="hidden flex-1 flex flex-col items-center justify-between p-6 md:p-8 space-y-4">
+            
+            <div class="text-center space-y-1">
+                <span class="text-6xl">🏆</span>
+                <h2 class="text-2xl font-black text-slate-800">훈련 작전 종료!</h2>
+                <p class="text-xs text-slate-500">우리가 버린 소중한 물을 눈으로 똑똑히 확인해 봐요!</p>
+            </div>
+
+            <!-- 페트병이 쫙 깔리는 시각화 보드 -->
+            <div class="w-full max-w-4xl bg-teal-50/40 rounded-3xl p-5 border border-teal-100 flex flex-col items-center space-y-3">
+                <div class="text-center">
+                    <span class="text-xs text-teal-600 font-extrabold block">지구에 버려져 쌓인 아까운 물</span>
+                    <span id="res-total-liters" class="text-3xl font-black text-rose-500 mt-0.5 block">0.0 L</span>
+                </div>
+
+                <div class="w-full bg-white rounded-2xl p-4 border shadow-inner">
+                    <span class="text-xs text-slate-400 font-bold mb-3 block text-center">👇 우리가 아끼지 않아 낭비된 대형 페트병(2L)들이 이렇게 쫙 깔렸어요!</span>
+                    <div id="bottle-grid" class="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-12 gap-2 max-h-[180px] overflow-y-auto justify-items-center p-3 border-2 border-dashed border-rose-100 rounded-xl bg-rose-50/20">
+                        <!-- 생수병 그림 SVG 생성 영역 -->
+                    </div>
+                    <p id="bottle-desc-txt" class="text-sm text-rose-600 font-extrabold mt-3 text-center">2L 페트병 0개가 마구 버려진 셈이에요!</p>
+                </div>
+            </div>
+
+            <!-- 스코어 배틀 결과 카드 -->
+            <div class="grid grid-cols-2 gap-4 w-full max-w-lg">
+                <div class="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
+                    <span class="text-xs text-amber-700 font-bold block">🦒 기린 수조 (1P)</span>
+                    <span id="res-p1-waste" class="text-lg font-black text-slate-800">0.0 L 낭비</span>
+                </div>
+                <div class="bg-orange-50 rounded-xl p-3 border border-orange-100 text-center">
+                    <span class="text-xs text-orange-700 font-bold block">🐯 호랑이 수조 (2P)</span>
+                    <span id="res-p2-waste" class="text-lg font-black text-slate-800">0.0 L 낭비</span>
+                </div>
+            </div>
+
+            <div class="text-center font-cute text-2xl font-black text-teal-700 mt-2" id="victory-txt">
+                누가 이겼을까?
+            </div>
+
+            <button onclick="startGame()" class="px-10 py-3.5 bg-teal-500 hover:bg-teal-600 active:scale-95 text-white font-black text-lg rounded-2xl shadow transition duration-150">
+                🔄 우리 다시 물 구하러 가볼까?
+            </button>
+        </div>
+
+    </main>
+
+    <footer class="w-full max-w-4xl mx-auto text-center mt-3 p-3 bg-white rounded-2xl shadow border-2 border-teal-50">
+        <p class="text-xs text-slate-600 font-bold">
+            🌱 <span class="text-teal-600">오늘의 약속:</span> 양치할 땐 양치컵 사용하고! 수도꼭지는 똑바로 끝까지 잘 잠그기!
+        </p>
+    </footer>
+
+    <!-- 자바스크립트 실시간 시나리오 및 인터랙션 엔진 -->
+    <script>
+        // --- 완벽한 위치 계산 및 고품질 SVG 아트워크 (버그 해결판) ---
+        const svgIllustration = {
+            giraffe: {
+                // 1P 기린 물 낭비 중(On): 입의 좌표(x:116, y:65)에 칫솔의 기준점(translate)을 완벽히 맞춤.
+                on: `
+                    <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <!-- 배경 -->
+                        <rect width="200" height="160" rx="24" fill="#FFFBEB" stroke="#FDE68A" stroke-width="4"/>
+                        <!-- 기린 목과 스카프 -->
+                        <path d="M100 160 Q104 102 108 72" stroke="#F59E0B" stroke-width="24" stroke-linecap="round" fill="none"/>
+                        <path d="M84 124 Q96 116 108 124" stroke="#60A5FA" stroke-width="12" stroke-linecap="round" fill="none"/>
+                        <!-- 기린 얼굴 (중심 cx:118, cy:52) -->
+                        <circle cx="118" cy="52" r="26" fill="#F59E0B"/>
+                        <!-- 주둥이 (cx:125, cy:62) -->
+                        <ellipse cx="125" cy="62" rx="16" ry="12" fill="#FEF3C7"/>
+                        <!-- 뿔 -->
+                        <line x1="108" y1="30" x2="103" y2="12" stroke="#B45309" stroke-width="5" stroke-linecap="round"/>
+                        <circle cx="103" cy="10" r="7" fill="#78350F"/>
+                        <line x1="126" y1="30" x2="131" y2="12" stroke="#B45309" stroke-width="5" stroke-linecap="round"/>
+                        <circle cx="131" cy="10" r="7" fill="#78350F"/>
+                        <!-- 귀 -->
+                        <path d="M96 46 Q84 40 92 54 Z" fill="#D97706" stroke="#B45309" stroke-width="1.5"/>
+                        
+                        <!-- 놀란 눈 -->
+                        <circle cx="110" cy="44" r="5" fill="#1E293B"/>
+                        <circle cx="128" cy="44" r="5" fill="#1E293B"/>
+                        <!-- 땀방울 -->
+                        <path d="M142 50 Q146 55 142 60 Q138 55 142 50" fill="#38BDF8"/>
+                        <!-- 시무룩 입 -->
+                        <path d="M114 66 Q118 63 122 66 Q126 63 130 66" stroke="#9F1239" stroke-width="2" fill="none"/>
+                        
+                        <!-- 몽글몽글 거품 (기린 입가 좌표 기준) -->
+                        <g class="foam-ani" style="transform-origin: 104px 76px;">
+                            <circle cx="104" cy="76" r="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+                            <circle cx="96" cy="80" r="6" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+                        </g>
+
+                        <!-- [수정됨] 칫솔을 기린 입가(116, 65)에 안전하게 박제 -->
+                        <g transform="translate(116, 65)">
+                            <!-- 이 그룹 안에서만 칫솔이 좌우로 쓱싹쓱싹 이동 (화면 밖으로 나가지 않음!) -->
+                            <g class="brush-ani">
+                                <!-- 칫솔 손잡이 (오른쪽으로 뻗음) -->
+                                <rect x="8" y="-4" width="40" height="8" rx="4" fill="#2DD4BF" stroke="#0F766E" stroke-width="2"/>
+                                <!-- 칫솔 하얀 미세모 -->
+                                <rect x="-8" y="-5" width="16" height="10" rx="4" fill="#FFF" stroke="#0F766E" stroke-width="2"/>
+                                <!-- 치약 거품 -->
+                                <path d="M-6 -5 Q0 -12 6 -5 Z" fill="#38BDF8" stroke="#0284C7" stroke-width="1.5"/>
+                            </g>
+                        </g>
+                    </svg>
+                `,
+                // 1P 기린 안전 상태(Off): 양치컵을 들고 대만족한 모습
+                off: `
+                    <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="200" height="160" rx="24" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="4"/>
+                        <path d="M100 160 Q104 102 108 72" stroke="#F59E0B" stroke-width="24" stroke-linecap="round" fill="none"/>
+                        <path d="M84 124 Q96 116 108 124" stroke="#10B981" stroke-width="12" stroke-linecap="round" fill="none"/>
+                        <circle cx="118" cy="52" r="26" fill="#F59E0B"/>
+                        <ellipse cx="125" cy="62" rx="16" ry="12" fill="#FEF3C7"/>
+                        <!-- 뿔 -->
+                        <line x1="108" y1="30" x2="103" y2="12" stroke="#B45309" stroke-width="5" stroke-linecap="round"/>
+                        <circle cx="103" cy="10" r="7" fill="#78350F"/>
+                        <line x1="126" y1="30" x2="131" y2="12" stroke="#B45309" stroke-width="5" stroke-linecap="round"/>
+                        <circle cx="131" cy="10" r="7" fill="#78350F"/>
+                        
+                        <!-- 눈웃음 -->
+                        <path d="M104 46 Q110 40 116 46" stroke="#78350F" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <path d="M120 46 Q126 40 132 46" stroke="#78350F" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+                        <circle cx="106" cy="53" r="5" fill="#FCA5A5"/>
+                        <circle cx="132" cy="53" r="5" fill="#FCA5A5"/>
+                        
+                        <!-- 웃는 입 -->
+                        <path d="M115 62 C118 66, 126 66, 129 62" stroke="#78350F" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                        
+                        <!-- 파란 컵 -->
+                        <g transform="translate(60, 95)">
+                            <path d="M-10 -15 L-6 15 C-5 17, 5 17, 6 15 L10 -15 Z" fill="#FEF08A" stroke="#CA8A04" stroke-width="2"/>
+                            <ellipse cx="0" cy="-15" rx="10" ry="3" fill="#FEF9C3" stroke="#CA8A04" stroke-width="2"/>
+                        </g>
+                    </svg>
+                `
+            },
+            tiger: {
+                // 2P 호랑이 물 낭비 중(On): 입의 좌표(x:100, y:96)에 칫솔의 기준점(translate)을 완벽히 맞춤.
+                on: `
+                    <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="200" height="160" rx="24" fill="#FFF7ED" stroke="#FFEDD5" stroke-width="4"/>
+                        <!-- 호랑이 몸통 -->
+                        <path d="M75 160 Q100 115 125 160" fill="#FB923C"/>
+                        <!-- 양쪽 귀 -->
+                        <circle cx="68" cy="54" r="18" fill="#FB923C"/>
+                        <circle cx="68" cy="54" r="11" fill="#FFEDD5"/>
+                        <circle cx="132" cy="54" r="18" fill="#FB923C"/>
+                        <circle cx="132" cy="54" r="11" fill="#FFEDD5"/>
+                        
+                        <!-- 호랑이 얼굴 (중심 cx:100, cy:82) -->
+                        <circle cx="100" cy="82" r="44" fill="#FB923C"/>
+                        <path d="M92 46 L108 46 M89 53 L111 53 M94 60 L106 60" stroke="#1E293B" stroke-width="3" stroke-linecap="round"/>
+                        
+                        <!-- 흰 주둥이 패드 (cx:100, cy:96 부근) -->
+                        <ellipse cx="86" cy="96" rx="14" ry="10" fill="#FFFFFF"/>
+                        <ellipse cx="114" cy="96" rx="14" ry="10" fill="#FFFFFF"/>
+                        <circle cx="100" cy="88" r="4" fill="#1E293B"/>
+                        
+                        <!-- 놀란 눈 -->
+                        <circle cx="85" cy="74" r="6" fill="#1E293B"/>
+                        <circle cx="115" cy="74" r="6" fill="#1E293B"/>
+                        <ellipse cx="74" cy="84" rx="5" ry="3" fill="#FECDD3"/>
+                        <ellipse cx="126" cy="84" rx="5" ry="3" fill="#FECDD3"/>
+                        
+                        <path d="M52 74 Q46 66 50 62 Z" fill="#38BDF8"/>
+                        
+                        <!-- 벌린 입 -->
+                        <path d="M96 95 Q100 100 104 95 Z" fill="#F43F5E" stroke="#1E293B" stroke-width="1.5"/>
+
+                        <!-- 몽글몽글 거품 (호랑이 입가 좌표 기준) -->
+                        <g class="foam-ani" style="transform-origin: 80px 100px;">
+                            <circle cx="80" cy="100" r="9" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+                        </g>
+                        <g class="foam-ani-alt" style="transform-origin: 120px 100px;">
+                            <circle cx="120" cy="100" r="9" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+                        </g>
+
+                        <!-- [수정됨] 칫솔을 호랑이 입가(100, 96)에 완벽하게 박제 -->
+                        <g transform="translate(100, 96)">
+                            <!-- 이 안에서만 좌우로 부드럽게 무빙 -->
+                            <g class="brush-ani">
+                                <!-- 칫솔 손잡이 (오른쪽으로 뻗음) -->
+                                <rect x="8" y="-4" width="40" height="8" rx="4" fill="#F43F5E" stroke="#9F1239" stroke-width="2"/>
+                                <!-- 칫솔 하얀 미세모 -->
+                                <rect x="-8" y="-5" width="16" height="10" rx="4" fill="#FFF" stroke="#9F1239" stroke-width="2"/>
+                                <!-- 치약 거품 -->
+                                <path d="M-6 -5 Q0 -12 6 -5 Z" fill="#F472B6" stroke="#DB2777" stroke-width="1.5"/>
+                            </g>
+                        </g>
+                    </svg>
+                `,
+                // 2P 아기호랑이 안전 상태(Off): 윙크하며 안심한 모습
+                off: `
+                    <svg viewBox="0 0 200 160" class="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="200" height="160" rx="24" fill="#ECFDF5" stroke="#BBF7D0" stroke-width="4"/>
+                        <path d="M75 160 Q100 115 125 160" fill="#FB923C"/>
+                        <circle cx="68" cy="54" r="18" fill="#FB923C"/>
+                        <circle cx="68" cy="54" r="11" fill="#FFEDD5"/>
+                        <circle cx="132" cy="54" r="18" fill="#FB923C"/>
+                        <circle cx="132" cy="54" r="11" fill="#FFEDD5"/>
+                        
+                        <circle cx="100" cy="82" r="44" fill="#FB923C"/>
+                        <path d="M92 46 L108 46 M89 53 L111 53 M94 60 L106 60" stroke="#1E293B" stroke-width="3.5" stroke-linecap="round"/>
+                        
+                        <ellipse cx="86" cy="96" rx="14" ry="10" fill="#FFFFFF"/>
+                        <ellipse cx="114" cy="96" rx="14" ry="10" fill="#FFFFFF"/>
+                        <circle cx="100" cy="88" r="4" fill="#1E293B"/>
+                        
+                        <!-- 윙크 눈 -->
+                        <path d="M78 72 Q84 78 90 72" stroke="#1E293B" stroke-width="3" fill="none" stroke-linecap="round"/>
+                        <circle cx="115" cy="74" r="6" fill="#1E293B"/>
+                        
+                        <ellipse cx="74" cy="84" rx="5" ry="3" fill="#FCA5A5"/>
+                        <ellipse cx="126" cy="84" rx="5" ry="3" fill="#FCA5A5"/>
+                        
+                        <!-- 해피 입 -->
+                        <path d="M94 94 Q100 100 106 94" stroke="#1E293B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+                        
+                        <!-- 파란 컵 장착 -->
+                        <g transform="translate(140, 95)">
+                            <path d="M-10 -15 L-6 15 C-5 17, 5 17, 6 15 L10 -15 Z" fill="#93C5FD" stroke="#1D4ED8" stroke-width="2"/>
+                            <ellipse cx="0" cy="-15" rx="10" ry="3" fill="#DBEAFE" stroke="#1D4ED8" stroke-width="2"/>
+                        </g>
+                    </svg>
+                `
+            }
+        };
+
+        // --- 실시간 상황 상황 대사집 ---
+        const dramaLines = {
+            p1: {
+                on: [
+                    "🚨 기린이가 딴청을 피우며 수돗물을 끄지 않고 흘려보내고 있어요!",
+                    "🚨 양치를 깨끗이 하겠다고 기린이가 물을 너무 세게 틀어놨어요!",
+                    "🚨 기린이가 칫솔을 닦으며 깜빡하고 수돗물을 방치 중이에요!"
+                ],
+                off: [
+                    "✨ 다행이에요! 기린이가 수도를 꼭 잠그고 바른 태도로 양치 중입니다!",
+                    "✨ 안심이에요! 기린이가 양치컵에 알뜰하게 물을 담아 행구고 있어요!",
+                    "✨ 멋져요! 기린이가 물 보안관의 활약을 보며 칭찬하고 있어요!"
+                ]
+            },
+            p2: {
+                on: [
+                    "🚨 아기호랑이가 노래를 부르며 물을 마구 흘려보내 장난치고 있어요!",
+                    "🚨 호랑이가 컵을 다 쓰고도 깜빡 잊어버리고 물을 안 잠갔어요!",
+                    "🚨 아기호랑이가 비누질을 하면서 수도꼭지 잠그는 걸 까먹었어요!"
+                ],
+                off: [
+                    "✨ 정말 잘했어요! 아기호랑이가 수도꼭지를 확인하고 착하게 잠갔어요!",
+                    "✨ 우와! 아기호랑이도 물 보안관 덕분에 깨끗하게 컵 양치를 완료했네요!",
+                    "✨ 성공! 지구의 생명수를 지키기 위해 수도꼭지를 잘 잠가놓았습니다!"
+                ]
+            }
+        };
+
+        // --- 정산용 귀여운 2L 페트병 SVG ---
+        const petBottleSvg = `
+            <svg class="w-10 h-16 bottle-pop hover:scale-110 duration-200" viewBox="0 0 50 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- 뚜껑 -->
+                <rect x="20" y="5" width="10" height="8" rx="2" fill="#2563eb"/>
+                <!-- 목구멍 -->
+                <rect x="22" y="13" width="6" height="7" fill="#93c5fd"/>
+                <!-- 병 본체 -->
+                <rect x="10" y="20" width="30" height="75" rx="6" fill="#e0f2fe" stroke="#3b82f6" stroke-width="2"/>
+                <!-- 파란 라벨지 -->
+                <rect x="10" y="45" width="30" height="25" fill="#3b82f6"/>
+                <text x="25" y="61" fill="white" font-size="7" font-weight="black" text-anchor="middle">2L 생수</text>
+                <!-- 물 잔량 시각화 -->
+                <path d="M12 25 Q25 22 38 25 L38 92 C38 92, 12 92, 12 92 Z" fill="#60a5fa" opacity="0.6"/>
+            </svg>
+        `;
+
+        // --- 게임 전역 데이터 구조 관리 ---
+        let mainInterval = null;
+        let physicsInterval = null;
+        let randomTriggerP1 = null;
+        let randomTriggerP2 = null;
+
+        let timeLeft = 30;
+        let p1Wasted = 0.0;
+        let p2Wasted = 0.0;
+        let isP1FaucetRunning = false;
+        let isP2FaucetRunning = false;
+
+        function startGame() {
+            document.getElementById('screen-intro').classList.add('hidden');
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-play').classList.remove('hidden');
+
+            timeLeft = 30;
+            p1Wasted = 0.0;
+            p2Wasted = 0.0;
+            isP1FaucetRunning = true; 
+            isP2FaucetRunning = true;
+
+            document.getElementById('game-timer').innerText = `${timeLeft}초`;
+            document.getElementById('total-waste').innerText = "0.0 L";
+            document.getElementById('p1-score').innerText = "누적 낭비: 0.0 L";
+            document.getElementById('p2-score').innerText = "누적 낭비: 0.0 L";
+
+            document.getElementById('p1-tank-water').style.height = "0%";
+            document.getElementById('p2-tank-water').style.height = "0%";
+
+            setAnimalVisual(1, "on", "🚨 기린이가 컵 없이 칫솔에 치약을 바르는 동안 수도가 흘러요!");
+            setAnimalVisual(2, "on", "🚨 아기호랑이가 칫솔에 물을 뿌리며 계속 방치 중이에요!");
+
+            updateHardwareUI(1);
+            updateHardwareUI(2);
+
+            clearInterval(mainInterval);
+            clearInterval(physicsInterval);
+            clearTimeout(randomTriggerP1);
+            clearTimeout(randomTriggerP2);
+
+            mainInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('game-timer').innerText = `${timeLeft}초`;
+                if (timeLeft <= 0) concludeGame();
+            }, 1000);
+
+            physicsInterval = setInterval(() => {
+                if (isP1FaucetRunning) {
+                    p1Wasted += 0.2;
+                    document.getElementById('p1-score').innerText = `누적 낭비: ${p1Wasted.toFixed(1)} L`;
+                    document.getElementById('p1-tank-water').style.height = `${Math.min((p1Wasted / 15) * 100, 100)}%`;
+                }
+                if (isP2FaucetRunning) {
+                    p2Wasted += 0.2;
+                    document.getElementById('p2-score').innerText = `누적 낭비: ${p2Wasted.toFixed(1)} L`;
+                    document.getElementById('p2-tank-water').style.height = `${Math.min((p2Wasted / 15) * 100, 100)}%`;
+                }
+                document.getElementById('total-waste').innerText = `${(p1Wasted + p2Wasted).toFixed(1)} L`;
+            }, 100);
+
+            scheduleRandomFaucet(1);
+            scheduleRandomFaucet(2);
+        }
+
+        function scheduleRandomFaucet(playerNum) {
+            if (timeLeft <= 1) return;
+            const nextTime = (Math.random() * 3500) + 3500;
+            const targetTimer = setTimeout(() => {
+                if (playerNum === 1) {
+                    if (!isP1FaucetRunning && timeLeft > 2) {
+                        isP1FaucetRunning = true;
+                        updateHardwareUI(1);
+                        setAnimalVisual(1, "on", dramaLines.p1.on[Math.floor(Math.random() * dramaLines.p1.on.length)]);
+                    }
+                    scheduleRandomFaucet(1);
+                } else {
+                    if (!isP2FaucetRunning && timeLeft > 2) {
+                        isP2FaucetRunning = true;
+                        updateHardwareUI(2);
+                        setAnimalVisual(2, "on", dramaLines.p2.on[Math.floor(Math.random() * dramaLines.p2.on.length)]);
+                    }
+                    scheduleRandomFaucet(2);
+                }
+            }, nextTime);
+
+            if (playerNum === 1) randomTriggerP1 = targetTimer;
+            else randomTriggerP2 = targetTimer;
+        }
+
+        function setAnimalVisual(playerNum, status, desc) {
+            if (playerNum === 1) {
+                document.getElementById('p1-illustration').innerHTML = svgIllustration.giraffe[status];
+                document.getElementById('p1-stage-desc').innerText = desc;
+            } else {
+                document.getElementById('p2-illustration').innerHTML = svgIllustration.tiger[status];
+                document.getElementById('p2-stage-desc').innerText = desc;
+            }
+        }
+
+        function tapFaucet(playerNum) {
+            if (playerNum === 1 && isP1FaucetRunning) {
+                isP1FaucetRunning = false;
+                updateHardwareUI(1);
+                setAnimalVisual(1, "off", dramaLines.p1.off[Math.floor(Math.random() * dramaLines.p1.off.length)]);
+            } else if (playerNum === 2 && isP2FaucetRunning) {
+                isP2FaucetRunning = false;
+                updateHardwareUI(2);
+                setAnimalVisual(2, "off", dramaLines.p2.off[Math.floor(Math.random() * dramaLines.p2.off.length)]);
+            }
+        }
+
+        function updateHardwareUI(playerNum) {
+            const isRunning = playerNum === 1 ? isP1FaucetRunning : isP2FaucetRunning;
+            const stream = document.getElementById(`p${playerNum}-stream`);
+            const led = document.getElementById(`p${playerNum}-led`);
+            const faucetBox = document.getElementById(`p${playerNum}-faucet`);
+
+            if (isRunning) {
+                stream.classList.remove('hidden');
+                led.className = "w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-white mb-1 shadow animate-ping";
+                faucetBox.classList.add('danger-shake');
+            } else {
+                stream.classList.add('hidden');
+                led.className = "w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white mb-1 shadow";
+                faucetBox.classList.remove('danger-shake');
+            }
+        }
+
+        function concludeGame() {
+            clearInterval(mainInterval);
+            clearInterval(physicsInterval);
+            clearTimeout(randomTriggerP1);
+            clearTimeout(randomTriggerP2);
+
+            document.getElementById('screen-play').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+
+            const scoreP1 = parseFloat(p1Wasted.toFixed(1));
+            const scoreP2 = parseFloat(p2Wasted.toFixed(1));
+            const grandLiters = parseFloat((scoreP1 + scoreP2).toFixed(1));
+
+            document.getElementById('res-total-liters').innerText = `${grandLiters} L`;
+            document.getElementById('res-p1-waste').innerText = `${scoreP1} L 낭비`;
+            document.getElementById('res-p2-waste').innerText = `${scoreP2} L 낭비`;
+
+            const bottleGrid = document.getElementById('bottle-grid');
+            bottleGrid.innerHTML = ""; 
+
+            const bottleCount = Math.max(Math.floor(grandLiters / 2), 1);
+            
+            for (let i = 0; i < Math.min(bottleCount, 120); i++) {
+                const bottleWrapper = document.createElement('div');
+                bottleWrapper.innerHTML = petBottleSvg;
+                const bottleElement = bottleWrapper.firstElementChild;
+                bottleElement.style.animationDelay = `${i * 0.03}s`;
+                bottleGrid.appendChild(bottleElement);
+            }
+
+            document.getElementById('bottle-desc-txt').innerText = `무려 2L 대형 페트병 ${bottleCount}개가 버려진 것과 똑같은 양이에요!`;
+
+            const victoryTxt = document.getElementById('victory-txt');
+            if (scoreP1 < scoreP2) {
+                victoryTxt.innerText = "🏆 1P 기린 지킴이 승리! 더 빠른 대처로 기린을 안전하게 구했어요!";
+                victoryTxt.className = "text-center font-cute text-2xl font-black text-amber-600 animate-bounce";
+            } else if (scoreP1 > scoreP2) {
+                victoryTxt.innerText = "🏆 2P 호랑이 지킴이 승리! 더 민첩한 손길로 호랑이를 살려냈어요!";
+                victoryTxt.className = "text-center font-cute text-2xl font-black text-orange-600 animate-bounce";
+            } else {
+                victoryTxt.innerText = "🤝 우와 무승부! 두 수호신 친구들이 완벽한 호흡을 맞추었네요!";
+                victoryTxt.className = "text-center font-cute text-2xl font-black text-teal-600";
+            }
+        }
+    </script>
+</body>
+</html>
